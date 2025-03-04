@@ -2,7 +2,7 @@ package main
 
 type NbaPlayer struct {
     UID string `json:"nba_player_uid"`
-    ID string `json:"nba_player_id"`
+    ID int `json:"nba_player_id"`
     Name string `json:"player_name"`
     Date string `json:"date"`
     Position string `json:"position"`

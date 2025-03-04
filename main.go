@@ -6,11 +6,13 @@ import (
     "os"
     "github.com/bwmarrin/discordgo"
     "github.com/joho/godotenv"
+    "context"
 )
 
 type NbaFantasyBot struct {
-    //client *NbaFantasyClient
+    client *NbaFantasyClient
     session *discordgo.Session
+    cache *PlayerCache
 }
 
 func newNbaFantasyBot() (*NbaFantasyBot, error) {
@@ -28,9 +30,20 @@ func newNbaFantasyBot() (*NbaFantasyBot, error) {
 
     bot := NbaFantasyBot{
         session: session,
+        client: newNbaFantasyClient(),
     }
 
     return &bot, nil
+}
+
+func (b *NbaFantasyBot) Init(ctx context.Context) error {
+    players, err := b.client.getTodaysPlayers(ctx)
+
+    if err != nil {
+        return err
+    }
+    b.cache = newPlayerCache(players)
+    return nil
 }
 
 func (b *NbaFantasyBot) Open() error {
@@ -58,5 +71,12 @@ func main() {
 
     defer bot.Close()
 
-    fmt.Println("hello world")
+    if err := bot.Init(context.Background()); err != nil {
+        log.Panic(err)
+    }
+
+    players := bot.cache.getPlayersByPos("PG")
+
+    fmt.Println(players)
+
 }
