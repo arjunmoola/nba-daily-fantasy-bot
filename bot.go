@@ -50,12 +50,15 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
     b.addCommand(createSetRosterCommand())
     b.registerHandler("set-roster", setRosterHandler(b))
 
+    fmt.Println(b.cmds)
+
     b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
         log.Println("Bot is up")
     })
 
     b.session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
         if h, ok := b.cmdHandlers[i.ApplicationCommandData().Name]; ok {
+            log.Println("here")
             h(s, i)
         }
     })
@@ -71,6 +74,17 @@ func (b *NbaFantasyBot) Run(ctx context.Context) error {
     defer b.Close()
 
     s := b.session
+
+    for pos := range b.cache.positions {
+        fmt.Println(pos)
+    }
+
+    players := b.cache.getPlayersByPos("C")
+
+    for _, player := range players {
+        fmt.Println(player)
+    }
+
 
     _, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, "", b.cmds)
 
@@ -103,3 +117,4 @@ func (b *NbaFantasyBot) addCommand(cmd *discordgo.ApplicationCommand) {
 func (b *NbaFantasyBot) registerHandler(name string, handler func(*discordgo.Session, *discordgo.InteractionCreate)) {
     b.cmdHandlers[name] = handler
 }
+

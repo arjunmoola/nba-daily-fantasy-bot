@@ -27,7 +27,7 @@ func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discord
     err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
         Type: discordgo.InteractionResponseChannelMessageWithSource,
         Data: &discordgo.InteractionResponseData{
-            Content: fmt.Sprintf("You picked %q autocompletion", data.Options[0].StringValue()),
+            Content: fmt.Sprintf("You picked %q", data.Options[0].StringValue()),
         },
     })
 
@@ -46,10 +46,27 @@ func handleSetRosterInteractionAutocomplete(bot *NbaFantasyBot, s *discordgo.Ses
         choices = createPlayerChoices(players)
 
         if data.Options[0].StringValue() != "" {
-            choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
-                Name: data.Options[0].StringValue(),
-                Value: "choice_custom",
-            })
+            choices = []*discordgo.ApplicationCommandOptionChoice{
+               &discordgo.ApplicationCommandOptionChoice{
+                    Name: data.Options[0].StringValue(),
+                    Value: data.Options[0].StringValue(),
+                },
+            }
+        }
+    case data.Options[1].Focused:
+        players := bot.cache.getPlayersByPos("C")
+
+        log.Println(players)
+
+        choices = createPlayerChoices(players)
+
+        if data.Options[1].StringValue() != "" {
+            choices = []*discordgo.ApplicationCommandOptionChoice{
+                &discordgo.ApplicationCommandOptionChoice{
+                    Name: data.Options[1].StringValue(),
+                    Value: data.Options[1].StringValue(),
+                },
+            }
         }
     }
 

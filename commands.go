@@ -11,8 +11,15 @@ func createSetRosterCommand() *discordgo.ApplicationCommand {
         Type: discordgo.ChatApplicationCommand,
         Options: []*discordgo.ApplicationCommandOption{
             {
-                Name: "PG",
+                Name: "pg",
                 Description: "Choose PG",
+                Type: discordgo.ApplicationCommandOptionString,
+                Required: true,
+                Autocomplete: true,
+            },
+            {
+                Name: "c",
+                Description: "Choose Center",
                 Type: discordgo.ApplicationCommandOptionString,
                 Required: true,
                 Autocomplete: true,

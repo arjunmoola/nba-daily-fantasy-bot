@@ -1,7 +1,6 @@
 package main
 
 import (
-    "fmt"
     "log"
     //"os"
     "github.com/joho/godotenv"
@@ -23,9 +22,6 @@ func main() {
     if err := bot.Init(context.Background()); err != nil {
         log.Panic(err)
     }
-
-    players := bot.cache.getPlayersByPos("PG")
-    fmt.Println(players)
 
     if err := bot.Run(context.Background()); err != nil {
         log.Panic(err)
