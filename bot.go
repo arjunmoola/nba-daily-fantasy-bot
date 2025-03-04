@@ -2,34 +2,11 @@ package main
 
 import (
     "fmt"
+    "log"
     "os"
+    "os/signal"
     "github.com/bwmarrin/discordgo"
     "context"
-)
-
-var (
-    commands = []*discordgo.ApplicationCommand{
-        {
-            Name: "set-roster",
-            Description: "set roster",
-            Type: discordgo.ChatApplicationCommand,
-            Options: []*discordgo.ApplicationCommandOption{
-                {
-                    Name: "PG",
-                    Description: "Choose PG",
-                    Type: discordgo.ApplicationCommandOptionString,
-                    Required: true,
-                    Autocomplete: true,
-                },
-            },
-        },
-    }
-
-    commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-        "set-roster": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-
-        },
-    }
 )
 
 type NbaFantasyBot struct {
@@ -70,6 +47,19 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
         return err
     }
     b.cache = newPlayerCache(players)
+    b.addCommand(createSetRosterCommand())
+    b.registerHandler("set-roster", setRosterHandler(b))
+
+    b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
+        log.Println("Bot is up")
+    })
+
+    b.session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+        if h, ok := b.cmdHandlers[i.ApplicationCommandData().Name]; ok {
+            h(s, i)
+        }
+    })
+
     return nil
 }
 
@@ -79,6 +69,21 @@ func (b *NbaFantasyBot) Run(ctx context.Context) error {
     }
 
     defer b.Close()
+
+    s := b.session
+
+    _, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, "", b.cmds)
+
+    if err != nil {
+        return err
+    }
+
+    stop := make(chan os.Signal, 1)
+
+    signal.Notify(stop, os.Interrupt)
+    <-stop
+
+    log.Println("Gracefully shutting down")
 
     return nil
 }
