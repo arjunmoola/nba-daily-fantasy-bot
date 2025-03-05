@@ -23,3 +23,28 @@ func computeSmithWaterman(a, b string) int {
     }
     return slices.Max(table)
 }
+
+func computeSmithWatermanFunc(a, b string, score func(i, j rune) int) int {
+    n := len(a)+1
+    m := len(b)+1
+    stride := m
+
+    table := make([]int, n*m)
+
+    for i := 1; i < n; i++ {
+        for j := 1; j < m; j++ {
+            s := score(rune(a[i-1]), rune(b[j-1]))
+            table[i*stride+j] = max(0, table[(i-1)*stride+(j-1)]+s, table[(i-1)*stride+j]+s, table[i*stride+(j-1)] + s)
+        }
+    }
+
+    return slices.Max(table)
+}
+
+func defaultScorer(s1, s2 rune) int {
+    if s1 != s2 {
+        return -1
+    } else {
+        return 2
+    }
+}

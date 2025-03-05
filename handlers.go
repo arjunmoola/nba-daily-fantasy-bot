@@ -101,7 +101,7 @@ func getClosestPlayers(src string, players []NbaPlayer) []playerScore {
     scores := make([]playerScore, len(players))
 
     for i, player := range players {
-        s := computeSmithWaterman(strings.ToLower(src), strings.ToLower(player.Name))
+        s := computeSmithWatermanFunc(strings.ToLower(src), strings.ToLower(player.Name), defaultScorer)
 
         scores[i] = playerScore{
             player: player.Name,
