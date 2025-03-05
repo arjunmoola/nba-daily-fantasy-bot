@@ -7,6 +7,8 @@ import (
     "os/signal"
     "github.com/bwmarrin/discordgo"
     "context"
+    "encoding/json"
+    "errors"
 )
 
 type NbaFantasyBot struct {
@@ -40,12 +42,37 @@ func newNbaFantasyBot() (*NbaFantasyBot, error) {
     return &bot, nil
 }
 
+func playersFromFile(path string) ([]NbaPlayer, error) {
+    file, err := os.Open(path)
+
+    if err != nil {
+        return nil, err
+    }
+
+    defer file.Close()
+
+    var players []NbaPlayer
+
+    if err := json.NewDecoder(file).Decode(&players); err != nil {
+        return nil, err
+    }
+
+    return players, nil
+}
+
 func (b *NbaFantasyBot) Init(ctx context.Context) error {
     players, err := b.client.getTodaysPlayers(ctx)
 
-    if err != nil {
+    if errors.Is(err, ErrRosterLocked) {
+        players, err = playersFromFile("cache/players.json")
+
+        if err != nil {
+            return err
+        }
+    } else if err != nil {
         return err
     }
+
     b.cache = newPlayerCache(players)
     b.addCommand(createSetRosterCommand())
     b.registerHandler("set-roster", setRosterHandler(b))

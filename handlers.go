@@ -45,24 +45,38 @@ func handleSetRosterInteractionAutocomplete(bot *NbaFantasyBot, s *discordgo.Ses
     switch {
     case data.Options[0].Focused:
         players := bot.cache.getPlayersByPos("PG")
-
         choices = createPlayerChoices(players)
-
         if data.Options[0].StringValue() != "" {
             fmt.Println(data.Options[0].StringValue())
             scores := getClosestPlayers(data.Options[0].StringValue(), players)
-            fmt.Println(scores)
             choices = createChoicesFromScores(scores)
         }
     case data.Options[1].Focused:
         players := bot.cache.getPlayersByPos("C")
-
-        log.Println(players)
-
         choices = createPlayerChoices(players)
-
         if data.Options[1].StringValue() != "" {
             scores := getClosestPlayers(data.Options[1].StringValue(), players)
+            choices = createChoicesFromScores(scores)
+        }
+    case data.Options[2].Focused:
+        players := bot.cache.getPlayersByPos("SF")
+        choices = createPlayerChoices(players)
+        if data.Options[2].StringValue() != "" {
+            scores := getClosestPlayers(data.Options[2].StringValue(), players)
+            choices = createChoicesFromScores(scores)
+        }
+    case data.Options[3].Focused:
+        players := bot.cache.getPlayersByPos("PF")
+        choices = createPlayerChoices(players)
+        if data.Options[3].StringValue() != "" {
+            scores := getClosestPlayers(data.Options[3].StringValue(), players)
+            choices = createChoicesFromScores(scores)
+        }
+    case data.Options[4].Focused:
+        players := bot.cache.getPlayersByPos("SG")
+        choices = createPlayerChoices(players)
+        if data.Options[4].StringValue() != "" {
+            scores := getClosestPlayers(data.Options[4].StringValue(), players)
             choices = createChoicesFromScores(scores)
         }
     }
@@ -99,17 +113,13 @@ func getClosestPlayers(src string, players []NbaPlayer) []playerScore {
     c := 0
 
     for _, s := range scores {
-        if s.score != 0 {
+        if s.score >= 4 {
             scores[c] = s
             c++
         }
     }
 
     scores = scores[:c]
-
-    if len(scores) > 25 {
-        scores = scores[:25]
-    }
 
     slices.SortFunc(scores, func(a, b playerScore) int {
         return -1 * cmp.Compare(a.score, b.score)

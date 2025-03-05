@@ -24,6 +24,27 @@ func createSetRosterCommand() *discordgo.ApplicationCommand {
                 Required: true,
                 Autocomplete: true,
             },
+            {
+                Name: "sf",
+                Description: "Choose Small Forward",
+                Type: discordgo.ApplicationCommandOptionString,
+                Required: true,
+                Autocomplete: true,
+            },
+            {
+                Name: "pf",
+                Description: "Choose Power Forward",
+                Type: discordgo.ApplicationCommandOptionString,
+                Required: true,
+                Autocomplete: true,
+            },
+            {
+                Name: "sg",
+                Description: "Choose shooting guard",
+                Type: discordgo.ApplicationCommandOptionString,
+                Required: true,
+                Autocomplete: true,
+            },
         },
     }   
 }

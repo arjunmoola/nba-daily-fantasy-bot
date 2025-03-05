@@ -6,7 +6,10 @@ import (
     "net/http"
     "context"
     "encoding/json"
+    "errors"
 )
+
+var ErrRosterLocked = errors.New("Roster is Locked")
 
 type NbaFantasyClient struct {
     baseUrl string
@@ -43,7 +46,7 @@ func (c *NbaFantasyClient) getTodaysPlayers(ctx context.Context) ([]NbaPlayer, e
     }
 
     if len(players) == 0 {
-        return nil, fmt.Errorf("roster is locked")
+        return nil, ErrRosterLocked
     }
 
     if err := savePlayers(players, "cache/players.json"); err != nil {
