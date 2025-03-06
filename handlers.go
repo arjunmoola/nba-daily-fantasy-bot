@@ -110,16 +110,7 @@ func getClosestPlayers(src string, players []NbaPlayer) []playerScore {
         }
     }
 
-    c := 0
-
-    for _, s := range scores {
-        if s.score >= 4 {
-            scores[c] = s
-            c++
-        }
-    }
-
-    scores = scores[:c]
+    scores = filterFunc(scores, greaterThanThreshold)
 
     slices.SortFunc(scores, func(a, b playerScore) int {
         return -1 * cmp.Compare(a.score, b.score)
@@ -127,6 +118,26 @@ func getClosestPlayers(src string, players []NbaPlayer) []playerScore {
 
     return scores
 
+}
+
+func filterFunc[S []T,T any](s S, f func(T) bool) S {
+    idx := 0
+    for _, x := range s {
+        if f(x) {
+            s[idx] = x
+            idx++
+        }
+    }
+    s = s[:idx]
+    return s
+}
+
+func greaterThanThreshold(x playerScore) bool {
+    if x.score >= 4 {
+        return true
+    } else {
+        return false
+    }
 }
 
 func createPlayerChoices(players []NbaPlayer) []*discordgo.ApplicationCommandOptionChoice {
