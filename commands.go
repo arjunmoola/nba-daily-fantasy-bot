@@ -48,3 +48,11 @@ func createSetRosterCommand() *discordgo.ApplicationCommand {
         },
     }   
 }
+
+func createGetGlobalRosterCommand() *discordgo.ApplicationCommand {
+    return &discordgo.ApplicationCommand{
+        Name: "global-roster",
+        Description: "Get global roster",
+        Type: discordgo.ChatApplicationCommand,
+    }
+}
