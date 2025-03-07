@@ -82,25 +82,6 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
 
     fmt.Println(date)
 
-    rosters, err := b.client.getGlobalRoster(ctx, date)
-
-    if err != nil {
-        return err
-    }
-
-    dr := newGlobalRoster(rosters)
-
-    for _, rp := range dr {
-        fmt.Println(rp.Nickname)
-
-        for _, nbaPlayer := range rp.players {
-            fmt.Println(nbaPlayer.Name, nbaPlayer.Position, nbaPlayer.Id)
-        }
-    }
-
-
-
-
     players, err := b.client.getTodaysPlayers(ctx)
 
     if errors.Is(err, ErrRosterLocked) {
@@ -118,6 +99,9 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
     b.cache = newPlayerCache(players)
     b.addCommand(createSetRosterCommand())
     b.registerHandler("set-roster", setRosterHandler(b))
+
+    b.addCommand(createGetGlobalRosterCommand())
+    b.registerHandler("global-roster", getGlobalRosterCommandHandler(b))
 
 
     b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {

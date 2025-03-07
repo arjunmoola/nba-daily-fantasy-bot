@@ -1,12 +1,14 @@
 package main
 
 import (
+    "time"
     "log"
     "fmt"
     "github.com/bwmarrin/discordgo"
     "strings"
     "slices"
     "cmp"
+    "context"
 )
 
 func setRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -191,3 +193,46 @@ func createChoicesFromScores(scores []playerScore) []*discordgo.ApplicationComma
     return choices
 }
 
+func getGlobalRosterCommandHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+        date := time.Now().Format(time.DateOnly)
+        discordPlayers, err := bot.client.getGlobalRoster(context.Background(), date)
+
+        if err != nil {
+            log.Println(err)
+            s.InteractionRespond(i.Interaction, errResponseInteraction("something went wrong"))
+            return
+        }
+
+        rosterMap := newGlobalRoster(discordPlayers)
+
+        builder := strings.Builder{}
+
+        for _, discordPlayer := range rosterMap {
+            builder.WriteString(discordPlayer.Nickname + "\n")
+            for _, nbaPlayer := range discordPlayer.players {
+                builder.WriteString(fmt.Sprintf("\t%s %s\n", nbaPlayer.Name, nbaPlayer.Position))
+            }
+        }
+
+        err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+            Type: discordgo.InteractionResponseChannelMessageWithSource,
+            Data: &discordgo.InteractionResponseData{
+                Content: builder.String(),
+            },
+        })
+
+        if err != nil {
+            log.Println(err)
+        }
+    }
+}
+
+func errResponseInteraction(msg string) *discordgo.InteractionResponse {
+    return &discordgo.InteractionResponse{
+        Type: discordgo.InteractionResponseChannelMessageWithSource,
+        Data: &discordgo.InteractionResponseData{
+            Content: msg,
+        },
+    }
+}
