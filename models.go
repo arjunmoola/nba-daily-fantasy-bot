@@ -20,3 +20,20 @@ type NbaPlayer struct {
     AvgAst string `json:"avg_ast"`
     AvgBlk string `json:"avg_blk"`
 }
+
+type DiscordPlayer struct {
+    NbaPlayerUID string `json:"nbaPlayerUid"`
+    NbaPlayerId int `json:"nbaPlayerId"`
+    Nickname string `json:"nickname"`
+    Name string `json:"name"`
+    DollarValue int `json:"dollarValue"`
+    FantasyScore *int `json:"fantasyScore"`
+    GuildId string `json:"guildId"`
+    DiscordPlayerId string `json:"discordPlayerId"`
+    Position string `json:"position"`
+}
+
+type LockTime struct {
+    Date string `json:"date"`
+    Time string `json:"lockTime"`
+}

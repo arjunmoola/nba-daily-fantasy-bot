@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "time"
     "log"
     "os"
     "os/signal"
@@ -61,9 +62,39 @@ func playersFromFile(path string) ([]NbaPlayer, error) {
 }
 
 func (b *NbaFantasyBot) Init(ctx context.Context) error {
+    lockTime, err := b.client.getLockTime(ctx)
+
+    if err != nil {
+        return err
+    }
+
+    log.Println(lockTime)
+
+    t, err := time.Parse(time.RFC3339, lockTime.Time)
+
+    if err != nil {
+        return err
+    }
+
+    log.Println(t)
+
+    date := time.Now().Format(time.DateOnly)
+
+    fmt.Println(date)
+
+    rosters, err := b.client.getGlobalRoster(ctx, date)
+
+    if err != nil {
+        return err
+    }
+
+    log.Println(rosters)
+
     players, err := b.client.getTodaysPlayers(ctx)
 
     if errors.Is(err, ErrRosterLocked) {
+        log.Println("Using cached players")
+
         players, err = playersFromFile("cache/players.json")
 
         if err != nil {
@@ -77,7 +108,6 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
     b.addCommand(createSetRosterCommand())
     b.registerHandler("set-roster", setRosterHandler(b))
 
-    fmt.Println(b.cmds)
 
     b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
         log.Println("Bot is up")
@@ -85,7 +115,6 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
 
     b.session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
         if h, ok := b.cmdHandlers[i.ApplicationCommandData().Name]; ok {
-            log.Println("here")
             h(s, i)
         }
     })
@@ -101,17 +130,6 @@ func (b *NbaFantasyBot) Run(ctx context.Context) error {
     defer b.Close()
 
     s := b.session
-
-    for pos := range b.cache.positions {
-        fmt.Println(pos)
-    }
-
-    players := b.cache.getPlayersByPos("C")
-
-    for _, player := range players {
-        fmt.Println(player)
-    }
-
 
     _, err := s.ApplicationCommandBulkOverwrite(s.State.User.ID, "", b.cmds)
 
