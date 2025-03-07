@@ -190,3 +190,4 @@ func createChoicesFromScores(scores []playerScore) []*discordgo.ApplicationComma
 
     return choices
 }
+
