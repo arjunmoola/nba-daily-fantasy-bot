@@ -27,10 +27,18 @@ func setRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordg
 func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
     data := i.ApplicationCommandData()
 
+    builder := strings.Builder{}
+
+    pos := []string{ "PG", "C", "SF", "PF", "SG" }
+
+    for i, option := range data.Options {
+        builder.WriteString(fmt.Sprintf("You picked %q for %s\n", option.StringValue(), pos[i]))
+    }
+
     err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
         Type: discordgo.InteractionResponseChannelMessageWithSource,
         Data: &discordgo.InteractionResponseData{
-            Content: fmt.Sprintf("You picked %q", data.Options[0].StringValue()),
+            Content: builder.String(),
         },
     })
 
@@ -138,6 +146,11 @@ func greaterThanThreshold(x playerScore) bool {
     } else {
         return false
     }
+}
+
+func createPlayerChoicesByPos(bot *NbaFantasyBot, pos string) []*discordgo.ApplicationCommandOptionChoice {
+    players := bot.cache.getPlayersByPos(pos)
+    return createPlayerChoices(players)
 }
 
 func createPlayerChoices(players []NbaPlayer) []*discordgo.ApplicationCommandOptionChoice {
