@@ -88,7 +88,18 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
         return err
     }
 
-    log.Println(rosters)
+    dr := newGlobalRoster(rosters)
+
+    for _, rp := range dr {
+        fmt.Println(rp.Nickname)
+
+        for _, nbaPlayer := range rp.players {
+            fmt.Println(nbaPlayer.Name, nbaPlayer.Position, nbaPlayer.Id)
+        }
+    }
+
+
+
 
     players, err := b.client.getTodaysPlayers(ctx)
 

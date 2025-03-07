@@ -31,6 +31,17 @@ type DiscordPlayer struct {
     GuildId string `json:"guildId"`
     DiscordPlayerId string `json:"discordPlayerId"`
     Position string `json:"position"`
+    Date string `json:"date"`
+}
+
+func (d DiscordPlayer) getRosterPlayer() nbaPlayerRoster {
+    return nbaPlayerRoster{
+        Uid: d.NbaPlayerUID,
+        Id: d.NbaPlayerId,
+        Name: d.Name,
+        DollarValue: d.DollarValue,
+        Position: d.Position,
+    }
 }
 
 type LockTime struct {
