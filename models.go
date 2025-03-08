@@ -9,7 +9,7 @@ type NbaPlayer struct {
     AgainstTeam int64 `json:"against_team"`
     AgainstTeamName string `json:"against_team_name"`
     DollarValue int64 `json:"dollar_value"`
-    FantasyScore *int64 `json:"fantasy_score"`
+    FantasyScore *float64 `json:"fantasy_score"`
     TeamId int64 `json:"team_id"`
     TeamName string `json:"team_name"`
     Status string `json:"status"`
@@ -27,7 +27,7 @@ type DiscordPlayer struct {
     Nickname string `json:"nickname"`
     Name string `json:"name"`
     DollarValue int `json:"dollarValue"`
-    FantasyScore *int `json:"fantasyScore"`
+    FantasyScore *float64 `json:"fantasyScore,omitempty"`
     GuildId string `json:"guildId"`
     DiscordPlayerId string `json:"discordPlayerId"`
     Position string `json:"position"`
@@ -41,10 +41,20 @@ func (d DiscordPlayer) getRosterPlayer() nbaPlayerRoster {
         Name: d.Name,
         DollarValue: d.DollarValue,
         Position: d.Position,
+        FantasyScore: d.FantasyScore,
     }
 }
 
 type LockTime struct {
     Date string `json:"date"`
     Time string `json:"lockTime"`
+}
+
+type myRosterPayLoad struct {
+    PlayerId string `json:"nba_player_uid"`
+    Position string `json:"position"`
+    GuildId string `json:"guild_id"`
+    Nickname string `json:"nickname"`
+    DiscordPlayerId string `json:"discord_player_id"`
+    Date string `json:"date"`
 }

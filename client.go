@@ -114,6 +114,7 @@ func (c *NbaFantasyClient) getGlobalRoster(ctx context.Context, date string) ([]
     return players, nil
 }
 
+
 func savePlayers(players []NbaPlayer, path string) error {
     file, err := os.Create(path)
 

@@ -49,6 +49,24 @@ func createSetRosterCommand() *discordgo.ApplicationCommand {
     }   
 }
 
+func createSetPGCommand() *discordgo.ApplicationCommand {
+    return &discordgo.ApplicationCommand{
+        Name: "set-pg",
+        Description: "Set PG",
+        Type: discordgo.ChatApplicationCommand,
+        Options: []*discordgo.ApplicationCommandOption{
+            {
+                Name: "pg",
+                Description: "Choose PG",
+                Type: discordgo.ApplicationCommandOptionString,
+                Required: true,
+                Autocomplete: true,
+            },
+        },
+    }
+}
+
+
 func createGetGlobalRosterCommand() *discordgo.ApplicationCommand {
     return &discordgo.ApplicationCommand{
         Name: "global-roster",

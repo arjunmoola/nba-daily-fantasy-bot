@@ -4,6 +4,7 @@ import (
     "sync"
     "cmp"
     "slices"
+    "strconv"
 )
 
 type PlayerCache struct {
@@ -38,4 +39,15 @@ func (c *PlayerCache) getPlayersByPos(pos string) []NbaPlayer {
     players := c.positions[pos]
 
     return slices.Clone(players)
+}
+
+func (c *PlayerCache) getPlayer(id string) (NbaPlayer, bool) {
+    i, _ := strconv.Atoi(id)
+
+    c.playersMx.RLock()
+    defer c.playersMx.RUnlock()
+
+    player, ok := c.players[i]
+
+    return player, ok
 }

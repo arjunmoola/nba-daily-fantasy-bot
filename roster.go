@@ -17,7 +17,7 @@ type nbaPlayerRoster struct {
     Id int
     Name string
     DollarValue int
-    FantasyScore *int
+    FantasyScore *float64
     Position string
 
 }

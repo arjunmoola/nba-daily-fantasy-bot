@@ -100,6 +100,9 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
     b.addCommand(createSetRosterCommand())
     b.registerHandler("set-roster", setRosterHandler(b))
 
+    b.addCommand(createSetPGCommand())
+    b.registerHandler("set-pg", setPGHandler(b))
+
     b.addCommand(createGetGlobalRosterCommand())
     b.registerHandler("global-roster", getGlobalRosterCommandHandler(b))
 
