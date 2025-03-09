@@ -172,7 +172,8 @@ func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discord
         totalSum += player.DollarValue
 
         if totalSum > 100 {
-            return s.InteractionRespond(i.Interaction, errResponseInteraction("exceeded maximum budget"))
+            //return s.InteractionRespond(i.Interaction, errResponseInteraction("exceeded maximum budget"))
+            fmt.Println("maximum budget exceeded")
         }
 
         payload := myRosterPayload{
