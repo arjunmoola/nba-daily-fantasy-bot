@@ -106,6 +106,9 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
     b.addCommand(createGetMyRosterCommand())
     b.registerHandler("my-roster", getMyRosterHandler(b))
 
+    b.addCommand(createResetRosterCommand())
+    b.registerHandler("reset-roster", resetRosterHandler(b))
+
     b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
         log.Println("Bot is up")
     })

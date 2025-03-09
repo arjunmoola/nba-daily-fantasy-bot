@@ -90,3 +90,11 @@ func createGetMyRosterCommand() *discordgo.ApplicationCommand {
         Type: discordgo.ChatApplicationCommand,
     }
 }
+
+func createResetRosterCommand() *discordgo.ApplicationCommand {
+    return &discordgo.ApplicationCommand {
+        Name: "reset-roster",
+        Description: "Reset Roster",
+        Type: discordgo.ChatApplicationCommand,
+    }
+}

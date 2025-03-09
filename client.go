@@ -187,6 +187,44 @@ func (c *NbaFantasyClient) setMyRoster(ctx context.Context, payload myRosterPayl
     return nil
 }
 
+func (c *NbaFantasyClient) deleteMyRoster(ctx context.Context, payload myRosterDeletePayload) error {
+    data, err := json.Marshal(payload)
+
+    if err != nil {
+        return err
+    }
+
+    url := fmt.Sprintf("%s/api/activity/my-roster", c.baseUrl)
+
+    req, err := http.NewRequestWithContext(ctx, "DELETE", url, bytes.NewBuffer(data))
+
+    if err != nil {
+        return err
+    }
+
+    req.Header.Add("Content-Type", "application/json")
+
+    resp, err := c.client.Do(req)
+
+    if err != nil {
+        return err
+    }
+
+    defer resp.Body.Close()
+
+    fmt.Println(resp.Status, resp.StatusCode)
+
+    data, err = io.ReadAll(resp.Body)
+
+    if err != nil {
+        return err
+    }
+
+    fmt.Println(string(data))
+
+    return nil
+}
+
 func (c *NbaFantasyClient) getMyRosterGuild(ctx context.Context, guildId string, discordPlayerId string, date string) ([]DiscordPlayer, error) {
     values := url.Values{}
     values.Add("date", date)

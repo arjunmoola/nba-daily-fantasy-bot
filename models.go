@@ -63,3 +63,16 @@ type myRosterPayload struct {
     DiscordPlayerId string `json:"discord_player_id"`
     Date string `json:"date"`
 }
+
+type myRosterDeletePayload struct {
+    NbaPlayerUID string `json:"nbaPlayerUid"`
+    NbaPlayerID int `json:"nbaPlayerId"`
+    Nickname string `json:"nickname"`
+    Name string `json:"name"`
+    DollarValue int `json:"dollarValue"`
+    FantasyScore float64 `json:"fantasyScore"`
+    GuildID string `json:"guildId"`
+    DiscordPlayerID string `json:"discordPlayerId"`
+    Position string `json:"position"`
+    Date string `json:"date"`
+}

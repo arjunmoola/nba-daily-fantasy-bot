@@ -36,6 +36,76 @@ func setRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordg
     }
 }
 
+func resetRosterHandler(bot *NbaFantasyBot) func (s *discordgo.Session, i *discordgo.InteractionCreate) {
+    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+        author := interactionAuthor(i.Interaction)
+        guildId := i.Interaction.GuildID
+        discordPlayerId := author.ID
+
+        date := time.Now().Format(time.DateOnly)
+
+        discordPlayers, err := bot.client.getMyRosterGuild(context.Background(), guildId, discordPlayerId, date)
+
+        if err != nil {
+            log.Println(err)
+            errInteractionRespond(s, i, "unable to get my roster. http error")
+            return
+        }
+
+        if len(discordPlayers) == 0 {
+            err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+                Type: discordgo.InteractionResponseChannelMessageWithSource,
+                Data: &discordgo.InteractionResponseData{
+                    Content: "Your roster is empty",
+                    Flags: discordgo.MessageFlagsEphemeral,
+                },
+            })
+
+            if err != nil {
+                log.Println(err)
+                return
+            }
+        }
+
+        for _, player := range discordPlayers {
+            rosterPlayer := player.getRosterPlayer()
+
+            payload := myRosterDeletePayload{
+                NbaPlayerUID: player.NbaPlayerUID,
+                NbaPlayerID: player.NbaPlayerId,
+                Nickname: player.Nickname,
+                Name: player.Name,
+                DollarValue: player.DollarValue,
+                FantasyScore: rosterPlayer.FantasyScore,
+                DiscordPlayerID: player.DiscordPlayerId,
+                GuildID: player.GuildId,
+                Position: player.Position,
+                Date: date,
+            }
+
+            fmt.Println(payload)
+
+            if err := bot.client.deleteMyRoster(context.Background(), payload); err != nil {
+                log.Println(err)
+                errInteractionRespond(s, i, fmt.Sprintf("unable to delete player %s", player.Name))
+                continue
+            }
+        }
+
+        err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+            Type: discordgo.InteractionResponseChannelMessageWithSource,
+            Data: &discordgo.InteractionResponseData{
+                Content: "Roster has been reset",
+                Flags: discordgo.MessageFlagsEphemeral,
+            },
+        })
+
+        if err != nil {
+            log.Println(err)
+        }
+    }
+}
+
 
 func getMyRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -351,6 +421,7 @@ func errResponseInteraction(msg string) *discordgo.InteractionResponse {
         Type: discordgo.InteractionResponseChannelMessageWithSource,
         Data: &discordgo.InteractionResponseData{
             Content: msg,
+            Flags: discordgo.MessageFlagsEphemeral,
         },
     }
 }
