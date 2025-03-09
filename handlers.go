@@ -36,91 +36,6 @@ func setRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordg
     }
 }
 
-func setPGHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-        switch i.Type{
-        case discordgo.InteractionApplicationCommand:
-            if err := handleSetPGInteractionApplicationCommand(bot, s, i); err != nil {
-                log.Println(err)
-                s.InteractionRespond(i.Interaction, errResponseInteraction("something went wrong"))
-                return
-            }
-        case discordgo.InteractionApplicationCommandAutocomplete:
-        if err := handleSetPGInteractionAutocomplete(bot, s, i); err != nil {
-                log.Println(err)
-                s.InteractionRespond(i.Interaction, errResponseInteraction("something went wrong"))
-                return
-            }
-        }
-    }
-}
-
-func getPGHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-        players := bot.cache.getPlayersByPos("PG")
-
-        builder := strings.Builder{}
-
-        for _, player := range players {
-            builder.WriteString(fmt.Sprintf("%s %d\n", player.Name, player.DollarValue))
-        }
-
-        err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-            Type: discordgo.InteractionResponseChannelMessageWithSource,
-            Data: &discordgo.InteractionResponseData{
-                Content: builder.String(),
-                Flags: discordgo.MessageFlagsEphemeral,
-            },
-        })
-
-        if err != nil {
-            log.Println(err)
-            errInteractionRespond(s, i, "something went wrong")
-            return
-        }
-
-        ch, err := s.UserChannelCreate(interactionAuthor(i.Interaction).ID)
-
-        if err != nil {
-            log.Println(err)
-
-            _, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-                Content: fmt.Sprintf("Mission failed. Cannot send a message to this error: %v", err),
-                Flags: discordgo.MessageFlagsEphemeral,
-            })
-
-            if err != nil {
-                log.Println(err)
-                return
-            }
-        }
-
-        _, err = s.ChannelMessageSend(ch.ID, fmt.Sprintf("Hi this is a channel message"))
-
-        if err != nil {
-            log.Println(err)
-            return
-        }
-
-        _, err = s.ChannelMessageSend(ch.ID, fmt.Sprintf("Hi this is another message"))
-
-        if err != nil {
-            log.Println(err)
-            return
-        }
-
-        for i := range 3 {
-            time.Sleep(time.Second)
-
-            _, err = s.ChannelMessageSend(ch.ID, fmt.Sprint("Hi this is another message %d", i))
-
-            if err != nil {
-                log.Println(err)
-                return
-            }
-        }
-    }
-}
 
 func getMyRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -166,34 +81,6 @@ func getMyRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discor
             return
         }
     }
-}
-
-func handleSetPGInteractionApplicationCommand(bot *NbaFantasyBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
-    data := i.ApplicationCommandData()
-
-    err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-        Type: discordgo.InteractionResponseChannelMessageWithSource,
-        Data: &discordgo.InteractionResponseData{
-            Content: fmt.Sprintf("You picked %q", data.Options[0].StringValue()),
-        },
-    })
-    return err
-}
-
-func handleSetPGInteractionAutocomplete(bot *NbaFantasyBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
-    data := i.ApplicationCommandData()
-
-    var choices []*discordgo.ApplicationCommandOptionChoice
-
-    players := bot.cache.getPlayersByPos("PG")
-    choices = createPlayerChoices(players)
-
-    if data.Options[0].StringValue() != "" {
-        scores := getClosestPlayers(data.Options[0].StringValue(), players)
-        choices = createChoicesFromScores(scores)
-    }
-
-    return autocompleteInteractionRespond(s, i, choices)
 }
 
 func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
