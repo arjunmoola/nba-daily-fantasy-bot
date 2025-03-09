@@ -1,7 +1,7 @@
 package main
 
 import (
-    //"time"
+    "time"
     "log"
     "fmt"
     "github.com/bwmarrin/discordgo"
@@ -51,6 +51,119 @@ func setPGHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.In
                 s.InteractionRespond(i.Interaction, errResponseInteraction("something went wrong"))
                 return
             }
+        }
+    }
+}
+
+func getPGHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+        players := bot.cache.getPlayersByPos("PG")
+
+        builder := strings.Builder{}
+
+        for _, player := range players {
+            builder.WriteString(fmt.Sprintf("%s %d\n", player.Name, player.DollarValue))
+        }
+
+        err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+            Type: discordgo.InteractionResponseChannelMessageWithSource,
+            Data: &discordgo.InteractionResponseData{
+                Content: builder.String(),
+                Flags: discordgo.MessageFlagsEphemeral,
+            },
+        })
+
+        if err != nil {
+            log.Println(err)
+            errInteractionRespond(s, i, "something went wrong")
+            return
+        }
+
+        ch, err := s.UserChannelCreate(interactionAuthor(i.Interaction).ID)
+
+        if err != nil {
+            log.Println(err)
+
+            _, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+                Content: fmt.Sprintf("Mission failed. Cannot send a message to this error: %v", err),
+                Flags: discordgo.MessageFlagsEphemeral,
+            })
+
+            if err != nil {
+                log.Println(err)
+                return
+            }
+        }
+
+        _, err = s.ChannelMessageSend(ch.ID, fmt.Sprintf("Hi this is a channel message"))
+
+        if err != nil {
+            log.Println(err)
+            return
+        }
+
+        _, err = s.ChannelMessageSend(ch.ID, fmt.Sprintf("Hi this is another message"))
+
+        if err != nil {
+            log.Println(err)
+            return
+        }
+
+        for i := range 3 {
+            time.Sleep(time.Second)
+
+            _, err = s.ChannelMessageSend(ch.ID, fmt.Sprint("Hi this is another message %d", i))
+
+            if err != nil {
+                log.Println(err)
+                return
+            }
+        }
+    }
+}
+
+func getMyRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+        author := interactionAuthor(i.Interaction)
+        guildId := i.Interaction.GuildID
+        discordPlayerId := author.ID
+
+        date := time.Now().Format(time.DateOnly)
+
+        discordPlayers, err := bot.client.getMyRosterGuild(context.Background(), guildId, discordPlayerId, date)
+
+        if err != nil {
+            log.Println(err)
+            errInteractionRespond(s, i, "unable to get my roster. http error")
+            return
+        }
+
+        builder := strings.Builder{}
+
+        totalValue := 0
+
+        for _, player := range discordPlayers {
+            rosterPlayer := player.getRosterPlayer()
+
+            totalValue += rosterPlayer.DollarValue
+            builder.WriteString(fmt.Sprintf("%s %s %d\n", rosterPlayer.Name, rosterPlayer.Position, rosterPlayer.DollarValue))
+        }
+
+        remainingValue := 100 - totalValue
+
+        builder.WriteString(fmt.Sprintf("remaining value: %d\n", remainingValue))
+
+        err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+            Type: discordgo.InteractionResponseChannelMessageWithSource,
+            Data: &discordgo.InteractionResponseData{
+                Content: builder.String(),
+                Flags: discordgo.MessageFlagsEphemeral,
+            },
+        })
+
+        if err != nil {
+            log.Println(err)
+            return
         }
     }
 }
@@ -105,13 +218,27 @@ func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discord
             return s.InteractionRespond(i.Interaction, errResponseInteraction("exceeded maximum budget"))
         }
 
-        builder.WriteString(fmt.Sprintf("You picked %q for %s\n", option.StringValue(), pos[j]))
+        payload := myRosterPayload{
+            PlayerId: player.UID,
+            Position: player.Position,
+            GuildId: i.Interaction.GuildID,
+            Nickname: interactionAuthor(i.Interaction).Username,
+            DiscordPlayerId: interactionAuthor(i.Interaction).ID,
+            Date: time.Now().Format(time.DateOnly),
+        }
+
+        if err := bot.client.setMyRoster(context.Background(), payload); err != nil {
+            return errInteractionRespond(s, i, "http post error")
+        }
+
+        builder.WriteString(fmt.Sprintf("You picked %q for %s\n", player.Name, pos[j]))
     }
 
     err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
         Type: discordgo.InteractionResponseChannelMessageWithSource,
         Data: &discordgo.InteractionResponseData{
             Content: builder.String(),
+            Flags: discordgo.MessageFlagsEphemeral,
         },
     })
 
@@ -289,7 +416,9 @@ func createChoicesFromScores(scores []playerScore) []*discordgo.ApplicationComma
 
 func getGlobalRosterCommandHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-        date := "2025-03-06"
+
+        date := time.Now().AddDate(0, 0, -1).Format(time.DateOnly)
+
         discordPlayers, err := bot.client.getGlobalRoster(context.Background(), date)
 
         if err != nil {
@@ -302,33 +431,25 @@ func getGlobalRosterCommandHandler(bot *NbaFantasyBot) func(s *discordgo.Session
 
         fmt.Println(user.ID, i.GuildID)
 
-        rosterMap := newGlobalRoster(discordPlayers)
+        leaderBoard := constructLeaderBoard(newGlobalRoster(discordPlayers))
 
-        str := ""
+        builder := strings.Builder{}
+
+        fmt.Fprintln(&builder, "### Global Leaderboard\n")
 
 
-        for _, discordPlayer := range rosterMap {
-            playerName := discordPlayer.Nickname
-            roster := ""
-            playerSum := 0.0
-            for _, nbaPlayer := range discordPlayer.players {
-                score := nbaPlayer.FantasyScore
-                fmt.Println(score)
-                if score != nil {
-                    roster += fmt.Sprintf("\t%s %s %.2f\n", nbaPlayer.Name, nbaPlayer.Position, *score)
-                    playerSum += *score
-                } else {
-                    roster += fmt.Sprintf("\t%s %s\n", nbaPlayer.Name, nbaPlayer.Position)
-                }
+        for _, player := range leaderBoard {
+            builder.WriteString(fmt.Sprintf("**%s** %.2f\n", player.Nickname, player.TotalScore))
+
+            for _, nbaPlayer := range player.players {
+                builder.WriteString(fmt.Sprintf("\t%s %s %.2f\n", nbaPlayer.Position, nbaPlayer.Name, nbaPlayer.FantasyScore))
             }
-
-            str += fmt.Sprintf("**%s** **%.2f**\n", playerName, playerSum) + roster
         }
 
         err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
             Type: discordgo.InteractionResponseChannelMessageWithSource,
             Data: &discordgo.InteractionResponseData{
-                Content: str,
+                Content: builder.String(),
             },
         })
 
@@ -345,4 +466,8 @@ func errResponseInteraction(msg string) *discordgo.InteractionResponse {
             Content: msg,
         },
     }
+}
+
+func errInteractionRespond(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) error {
+    return s.InteractionRespond(i.Interaction, errResponseInteraction(msg))
 }

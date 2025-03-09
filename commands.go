@@ -74,3 +74,19 @@ func createGetGlobalRosterCommand() *discordgo.ApplicationCommand {
         Type: discordgo.ChatApplicationCommand,
     }
 }
+
+func createGetPGCommand() *discordgo.ApplicationCommand {
+    return &discordgo.ApplicationCommand{
+        Name: "get-pg",
+        Description: "Get all playing point guards",
+        Type: discordgo.ChatApplicationCommand,
+    }
+}
+
+func createGetMyRosterCommand() *discordgo.ApplicationCommand {
+    return &discordgo.ApplicationCommand{
+        Name: "my-roster",
+        Description: "Get my roster today",
+        Type: discordgo.ChatApplicationCommand,
+    }
+}

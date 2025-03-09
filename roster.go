@@ -2,6 +2,8 @@ package main
 
 import (
     "sync"
+    "slices"
+    "cmp"
 )
 
 type DiscordPlayerRoster struct {
@@ -10,6 +12,7 @@ type DiscordPlayerRoster struct {
     GuildId string
     Date string
     players []nbaPlayerRoster
+    TotalScore float64
 }
 
 type nbaPlayerRoster struct {
@@ -17,7 +20,7 @@ type nbaPlayerRoster struct {
     Id int
     Name string
     DollarValue int
-    FantasyScore *float64
+    FantasyScore float64
     Position string
 
 }
@@ -44,6 +47,35 @@ func newGlobalRoster(players []DiscordPlayer) map[string]*DiscordPlayerRoster {
         }
     }
 
-    return rosters
+    for _, player := range rosters {
+        player.setTotalScore()
 
+        slices.SortFunc(player.players, func(a, b nbaPlayerRoster) int {
+            return -1 * cmp.Compare(a.FantasyScore, b.FantasyScore)
+        })
+    }
+
+    return rosters
+}
+
+func constructLeaderBoard(rosters map[string]*DiscordPlayerRoster) []*DiscordPlayerRoster {
+    var leaderboard []*DiscordPlayerRoster
+
+    for _, player := range rosters {
+        leaderboard = append(leaderboard, player)
+    }
+
+    slices.SortFunc(leaderboard, func(a, b *DiscordPlayerRoster) int {
+        return -1*cmp.Compare(a.TotalScore, b.TotalScore)
+    })
+
+    return leaderboard
+}
+
+func (p *DiscordPlayerRoster) setTotalScore() {
+    totalScore := float64(0)
+    for _, player := range p.players {
+        totalScore += player.FantasyScore
+    }
+    p.TotalScore = totalScore
 }

@@ -35,13 +35,18 @@ type DiscordPlayer struct {
 }
 
 func (d DiscordPlayer) getRosterPlayer() nbaPlayerRoster {
+    score := float64(0)
+
+    if d.FantasyScore != nil {
+        score = *(d.FantasyScore)
+    }
     return nbaPlayerRoster{
         Uid: d.NbaPlayerUID,
         Id: d.NbaPlayerId,
         Name: d.Name,
         DollarValue: d.DollarValue,
         Position: d.Position,
-        FantasyScore: d.FantasyScore,
+        FantasyScore: score,
     }
 }
 
@@ -50,7 +55,7 @@ type LockTime struct {
     Time string `json:"lockTime"`
 }
 
-type myRosterPayLoad struct {
+type myRosterPayload struct {
     PlayerId string `json:"nba_player_uid"`
     Position string `json:"position"`
     GuildId string `json:"guild_id"`

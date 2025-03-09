@@ -1,8 +1,11 @@
 package main
 
 import (
+    "io"
+    "bytes"
     "fmt"
     "os"
+    "log"
     "net/http"
     "context"
     "encoding/json"
@@ -114,6 +117,72 @@ func (c *NbaFantasyClient) getGlobalRoster(ctx context.Context, date string) ([]
     return players, nil
 }
 
+func (c *NbaFantasyClient) setMyRoster(ctx context.Context, payload myRosterPayload) error {
+    url := fmt.Sprintf("%s/api/activity/my-roster", c.baseUrl)
+
+    data, err := json.Marshal(payload)
+
+    if err != nil {
+        return err
+    }
+
+    req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(data))
+
+    if err != nil {
+        return err
+    }
+
+    req.Header.Add("Content-Type", "application/json")
+
+
+    resp, err := c.client.Do(req)
+
+    if err != nil {
+        return err
+    }
+
+    defer resp.Body.Close()
+
+    log.Println(resp.Status, resp.StatusCode)
+
+    data, err = io.ReadAll(resp.Body)
+
+    if err != nil {
+        return err
+    }
+
+    fmt.Println(string(data))
+
+    return nil
+}
+
+func (c *NbaFantasyClient) getMyRosterGuild(ctx context.Context, guildId string, discordPlayerId string, date string) ([]DiscordPlayer, error) {
+    values := url.Values{}
+    values.Add("date", date)
+    url := fmt.Sprintf("%s/api/activity/my-roster/%s/%s?%s", c.baseUrl, guildId, discordPlayerId, values.Encode())
+
+    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+
+    if err != nil {
+        return nil, err
+    }
+
+    resp, err := c.client.Do(req)
+
+    if err != nil {
+        return nil, err
+    }
+
+    defer resp.Body.Close()
+
+    var discordPlayers []DiscordPlayer
+
+    if err := json.NewDecoder(resp.Body).Decode(&discordPlayers); err != nil {
+        return nil, err
+    }
+
+    return discordPlayers, nil
+}
 
 func savePlayers(players []NbaPlayer, path string) error {
     file, err := os.Create(path)
