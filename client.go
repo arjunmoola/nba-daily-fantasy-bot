@@ -117,6 +117,37 @@ func (c *NbaFantasyClient) getGlobalRoster(ctx context.Context, date string) ([]
     return players, nil
 }
 
+func (c *NbaFantasyClient) getWeeklyRoster(ctx context.Context, guildId string, date string) ([]DiscordPlayer, error) {
+    values := url.Values{}
+    values.Add("date", date)
+
+    url := fmt.Sprintf("%s/api/activity/rosters/%s/weekly?%s", c.baseUrl, guildId, values.Encode())
+
+    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+
+    if err != nil {
+        return nil, err
+    }
+
+    resp, err := c.client.Do(req)
+
+    if err != nil {
+        return nil, err
+    }
+
+    defer resp.Body.Close()
+
+    var players []DiscordPlayer 
+
+    if err := json.NewDecoder(resp.Body).Decode(&players); err != nil {
+        return nil, err
+    }
+
+    fmt.Println(players)
+
+    return players, nil
+}
+
 func (c *NbaFantasyClient) setMyRoster(ctx context.Context, payload myRosterPayload) error {
     url := fmt.Sprintf("%s/api/activity/my-roster", c.baseUrl)
 
