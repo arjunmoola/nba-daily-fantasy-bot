@@ -182,7 +182,8 @@ func (c *NbaFantasyClient) setMyRoster(ctx context.Context, payload myRosterPayl
         return err
     }
 
-    fmt.Println(string(data))
+    log.Println(string(data))
+
 
     return nil
 }

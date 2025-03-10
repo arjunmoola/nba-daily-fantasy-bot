@@ -160,32 +160,46 @@ func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discord
 
     pos := []string{ "PG", "C", "SF", "PF", "SG" }
 
+    author := interactionAuthor(i.Interaction)
+    guildId := i.Interaction.GuildID
+    nickName := author.Username
+    discordPlayerId := author.ID
+    date := time.Now().Format(time.DateOnly)
+
+    existingPlayers, _ := bot.client.getMyRosterGuild(context.Background(), guildId, discordPlayerId, date)
+
     var totalSum int64
 
     for j, option := range data.Options {
         player, ok := bot.cache.getPlayer(option.Value.(string))
 
+
         if !ok {
+            continue
+        }
+
+        if exits := containsPlayer(existingPlayers, player.ID); exits {
             continue
         }
 
         totalSum += player.DollarValue
 
         if totalSum > 100 {
-            //return s.InteractionRespond(i.Interaction, errResponseInteraction("exceeded maximum budget"))
-            fmt.Println("maximum budget exceeded")
+            return s.InteractionRespond(i.Interaction, errResponseInteraction("exceeded maximum budget"))
         }
 
         payload := myRosterPayload{
             PlayerId: player.UID,
             Position: player.Position,
             GuildId: i.Interaction.GuildID,
-            Nickname: interactionAuthor(i.Interaction).Username,
-            DiscordPlayerId: interactionAuthor(i.Interaction).ID,
-            Date: time.Now().Format(time.DateOnly),
+            Nickname: nickName,
+            DiscordPlayerId: discordPlayerId,
+            Date: date,
         }
 
-        if err := bot.client.setMyRoster(context.Background(), payload); err != nil {
+        err := bot.client.setMyRoster(context.Background(), payload)
+
+        if err != nil {
             return errInteractionRespond(s, i, "http post error")
         }
 
@@ -319,6 +333,25 @@ func filterFunc[S []T,T any](s S, f func(T) bool) S {
     }
     s = s[:idx]
     return s
+}
+
+func containsFunc[S []T, T any](s S, y T, f func(T, T) bool) bool {
+    for _, x := range s {
+        if f(x, y) {
+            return true
+        }
+    }
+    return false
+}
+
+func containsPlayer(players []DiscordPlayer, id int) bool {
+    for _, player := range players {
+        if id == player.NbaPlayerId {
+            return true
+        }
+    }
+
+    return false
 }
 
 func greaterThanThreshold(x playerScore) bool {

@@ -64,6 +64,10 @@ type myRosterPayload struct {
     Date string `json:"date"`
 }
 
+type setRosterResponse struct {
+    Error string `json:"error"`
+}
+
 type myRosterDeletePayload struct {
     NbaPlayerUID string `json:"nbaPlayerUid"`
     NbaPlayerID int `json:"nbaPlayerId"`
