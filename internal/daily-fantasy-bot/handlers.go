@@ -412,7 +412,9 @@ func getGlobalRosterCommandHandler(bot *NbaFantasyBot) func(s *discordgo.Session
 
         date := time.Now().AddDate(0, 0, -1).Format(time.DateOnly)
 
-        discordPlayers, err := bot.client.GetGlobalRoster(context.Background(), date)
+		fmt.Println("date: ", date)
+
+        discordPlayers, err := bot.client.Roster.GetGlobalRoster(context.Background(), date)
 
         if err != nil {
             log.Println(err)

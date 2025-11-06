@@ -35,12 +35,20 @@ func NewNbaFantasyBot() (*NbaFantasyBot, error) {
     if err != nil {
 		return nil, fmt.Errorf("failed to get session %v", err)
     }
+	
+	client, err := clientpkg.NewNbaFantasyClient()
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to setup http client %v", err)
+	}
 
     bot := NbaFantasyBot{
         session: session,
-        client: clientpkg.NewNbaFantasyClient(),
+		client: client,
         cmdHandlers: make(map[string]func(*discordgo.Session, *discordgo.InteractionCreate)),
     }
+
+	fmt.Println("new session created")
 
     return &bot, nil
 }
@@ -64,7 +72,7 @@ func playersFromFile(path string) ([]typespkg.NbaPlayer, error) {
 }
 
 func (b *NbaFantasyBot) Init(ctx context.Context) error {
-    lockTime, err := b.client.GetLockTime(ctx)
+    lockTime, err := b.client.Activity.GetLockTime(ctx)
 
     if err != nil {
         return err
@@ -84,7 +92,7 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
 
     fmt.Println(date)
 
-    players, err := b.client.GetTodaysPlayers(ctx)
+    players, err := b.client.Activity.GetTodaysPlayers(ctx)
 
     if errors.Is(err, clientpkg.ErrRosterLocked) {
         log.Println("Using cached players")
@@ -97,6 +105,8 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
     } else if err != nil {
         return err
     }
+
+	fmt.Println(players)
 
     b.cache = newPlayerCache(players)
     b.addCommand(createSetRosterCommand())

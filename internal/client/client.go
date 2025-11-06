@@ -1,6 +1,7 @@
 package client
 
 import (
+	//"maps"
     "io"
     "bytes"
     "fmt"
@@ -17,49 +18,179 @@ import (
 var ErrRosterLocked = errors.New("Roster is Locked")
 
 type NbaFantasyClient struct {
-    baseUrl string
+    baseUrl *url.URL
     client *http.Client
+
+	Activity *Activity
+	Roster *Roster
 }
 
-func NewNbaFantasyClient() *NbaFantasyClient {
-    url := os.Getenv("URL")
-    return &NbaFantasyClient{
-        baseUrl: url,
+type Activity struct {
+	client *NbaFantasyClient
+}
+
+func (a *Activity) newURLConstructor() *urlConstructor {
+	cons := newUrlConstructor(a.client.baseUrl)
+	cons.join("activity")
+	return cons
+}
+
+type Roster struct {
+	client *NbaFantasyClient
+}
+
+func (r *Roster) newUrlConstructor() *urlConstructor {
+	cons := newUrlConstructor(r.client.baseUrl)
+	cons.join("activity", "roster")
+	return cons
+}
+
+type urlConstructor struct {
+	base *url.URL
+	method string
+	body io.Reader
+	values url.Values
+}
+
+func newUrlConstructor(base *url.URL) *urlConstructor {
+	return &urlConstructor{
+		base: base,
+		values: make(url.Values),
+	}
+}
+
+func (c *urlConstructor) join(s ...string) {
+	c.base = c.base.JoinPath(s...)
+}
+
+func (c *urlConstructor) set(key, value string) {
+	c.values.Set(key, value)
+}
+
+func (c *urlConstructor) setMethod(method string) {
+	c.method = method
+}
+
+func (c *urlConstructor) String() string {
+	c.base.RawQuery = c.values.Encode()
+	return c.base.String()
+}
+
+func (c *urlConstructor) NewRequestWithContext(ctx context.Context) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, c.method, c.String(), c.body)
+}
+
+func doRequest(ctx context.Context, client *http.Client, cons *urlConstructor, v any) error {
+	req, err := cons.NewRequestWithContext(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	return fetchRequest(client, req, v)
+}
+
+func fetchRequest(client *http.Client, req *http.Request, v any) error {
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(data, v)
+}
+
+func NewNbaFantasyClient() (*NbaFantasyClient, error) {
+	serverURL := os.Getenv("URL")
+	baseUrl, err := url.Parse(serverURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("server url incorrect. unable to parse url %v", err)
+	}
+
+	client := &NbaFantasyClient{
+        baseUrl: baseUrl,
         client: &http.Client{},
     }
+
+	activity := &Activity{
+		client: client,
+	}
+
+	roster := &Roster{
+		client: client,
+	}
+
+	client.Activity = activity
+	client.Roster = roster
+
+
+
+	return client, nil
 }
 
-func (c *NbaFantasyClient) GetTodaysPlayers(ctx context.Context) ([]typespkg.NbaPlayer, error) {
-    url := fmt.Sprintf("%s/api/activity/todays-players", c.baseUrl)
+func (a *Activity) GetTodaysPlayers(ctx context.Context) ([]typespkg.NbaPlayer, error) {
+	cons := a.newURLConstructor()
+	cons.join("todays-players")
+	cons.setMethod(http.MethodGet)
 
-    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-    if err != nil {
-        return nil, err
-    }
+	var players []typespkg.NbaPlayer
 
-    resp, err := c.client.Do(req)
+	if err := doRequest(ctx, a.client.client, cons, &players); err != nil {
+		return nil, err
+	}
 
-    if err != nil {
-        return nil, err
-    }
+	return players, nil
+}
 
-    defer resp.Body.Close()
+func (a *Activity) GetLockTime(ctx context.Context) (*typespkg.LockTime, error) {
+	cons := a.newURLConstructor()
+	cons.join("lock-time")
+	cons.setMethod(http.MethodGet)
 
-    var players []typespkg.NbaPlayer
+	var lockTime typespkg.LockTime
 
-    if err := json.NewDecoder(resp.Body).Decode(&players); err != nil {
-        return nil, err
-    }
+	if err := doRequest(ctx, a.client.client, cons, &lockTime); err != nil {
+		return nil, err
+	}
 
-    if len(players) == 0 {
-        return nil, ErrRosterLocked
-    }
+	return &lockTime, nil
+}
 
-    if err := savePlayers(players, "cache/players.json"); err != nil {
-        return nil, err
-    }
+func (r *Roster) GetGlobalRoster(ctx context.Context, date string) ([]typespkg.DiscordPlayer, error) {
+	cons := r.newUrlConstructor()
+	cons.set("date", date)
+	cons.setMethod(http.MethodGet)
 
-    return players, nil
+	var players []typespkg.DiscordPlayer
+
+	if err := doRequest(ctx, r.client.client, cons, &players); err != nil {
+		return nil, err
+	}
+
+	return players, nil
+}
+
+func (r *Roster) GetWeeklyRoster(ctx context.Context, guidId string, date string) ([]typespkg.DiscordPlayer, error) {
+	cons := r.newUrlConstructor()
+	cons.join(guidId, "weekly")
+	cons.set("date", date)
+	
+	var players []typespkg.DiscordPlayer
+
+	if err := doRequest(ctx, r.client.client, cons, &players); err != nil {
+		return nil, err
+	}
+
+	return players, nil
 }
 
 func (c *NbaFantasyClient) GetLockTime(ctx context.Context) (*typespkg.LockTime, error) {
