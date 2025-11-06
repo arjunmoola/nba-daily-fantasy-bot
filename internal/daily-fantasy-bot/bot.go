@@ -1,4 +1,4 @@
-package main
+package dailyfantasybot
 
 import (
     "fmt"
@@ -10,10 +10,12 @@ import (
     "context"
     "encoding/json"
     "errors"
+    clientpkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/client"
+    typespkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/types"
 )
 
 type NbaFantasyBot struct {
-    client *NbaFantasyClient
+    client *clientpkg.NbaFantasyClient
     session *discordgo.Session
     cache *PlayerCache
 
@@ -21,7 +23,7 @@ type NbaFantasyBot struct {
     cmdHandlers map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
 }
 
-func newNbaFantasyBot() (*NbaFantasyBot, error) {
+func NewNbaFantasyBot() (*NbaFantasyBot, error) {
     token := os.Getenv("TOKEN")
 
     if token == "" {
@@ -36,14 +38,14 @@ func newNbaFantasyBot() (*NbaFantasyBot, error) {
 
     bot := NbaFantasyBot{
         session: session,
-        client: newNbaFantasyClient(),
+        client: clientpkg.NewNbaFantasyClient(),
         cmdHandlers: make(map[string]func(*discordgo.Session, *discordgo.InteractionCreate)),
     }
 
     return &bot, nil
 }
 
-func playersFromFile(path string) ([]NbaPlayer, error) {
+func playersFromFile(path string) ([]typespkg.NbaPlayer, error) {
     file, err := os.Open(path)
 
     if err != nil {
@@ -52,7 +54,7 @@ func playersFromFile(path string) ([]NbaPlayer, error) {
 
     defer file.Close()
 
-    var players []NbaPlayer
+    var players []typespkg.NbaPlayer
 
     if err := json.NewDecoder(file).Decode(&players); err != nil {
         return nil, err
@@ -62,7 +64,7 @@ func playersFromFile(path string) ([]NbaPlayer, error) {
 }
 
 func (b *NbaFantasyBot) Init(ctx context.Context) error {
-    lockTime, err := b.client.getLockTime(ctx)
+    lockTime, err := b.client.GetLockTime(ctx)
 
     if err != nil {
         return err
@@ -82,9 +84,9 @@ func (b *NbaFantasyBot) Init(ctx context.Context) error {
 
     fmt.Println(date)
 
-    players, err := b.client.getTodaysPlayers(ctx)
+    players, err := b.client.GetTodaysPlayers(ctx)
 
-    if errors.Is(err, ErrRosterLocked) {
+    if errors.Is(err, clientpkg.ErrRosterLocked) {
         log.Println("Using cached players")
 
         players, err = playersFromFile("cache/players.json")

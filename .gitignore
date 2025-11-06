@@ -1,3 +1,5 @@
 .env
 nba-daily-fantasy-bot
 cache
+bin/
+*.sh
