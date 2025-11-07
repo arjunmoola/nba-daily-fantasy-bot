@@ -1,6 +1,8 @@
 module github.com/arjunmoola/nba-daily-fantasy-bot
 
-go 1.23.2
+go 1.24.0
+
+toolchain go1.24.1
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1 // indirect
@@ -11,7 +13,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )

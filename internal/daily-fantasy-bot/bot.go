@@ -10,17 +10,30 @@ import (
     "context"
     "encoding/json"
     "errors"
+	"log/slog"
     clientpkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/client"
     typespkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/types"
 )
+
+type BotOption func(n *NbaFantasyBot)
+
+func WithLogger(l *slog.Logger) BotOption {
+	return func(n *NbaFantasyBot) {
+		n.logger = l
+	}
+}
+
+type InteractionHandler func(*discordgo.Session, *discordgo.InteractionCreate)
 
 type NbaFantasyBot struct {
     client *clientpkg.NbaFantasyClient
     session *discordgo.Session
     cache *PlayerCache
 
+	logger *slog.Logger
+
     cmds []*discordgo.ApplicationCommand
-    cmdHandlers map[string]func(*discordgo.Session, *discordgo.InteractionCreate)
+    cmdHandlers map[string]InteractionHandler
 }
 
 func NewNbaFantasyBot() (*NbaFantasyBot, error) {
@@ -45,7 +58,7 @@ func NewNbaFantasyBot() (*NbaFantasyBot, error) {
     bot := NbaFantasyBot{
         session: session,
 		client: client,
-        cmdHandlers: make(map[string]func(*discordgo.Session, *discordgo.InteractionCreate)),
+        cmdHandlers: make(map[string]InteractionHandler),
     }
 
 	fmt.Println("new session created")

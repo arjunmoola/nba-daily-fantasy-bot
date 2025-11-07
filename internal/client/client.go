@@ -7,6 +7,7 @@ import (
     "fmt"
     "os"
     "log"
+	"log/slog"
     "net/http"
     "context"
     "encoding/json"
@@ -17,7 +18,17 @@ import (
 
 var ErrRosterLocked = errors.New("Roster is Locked")
 
+type ClientOption func(c *NbaFantasyClient)
+
+func WithLogger(l *slog.Logger) ClientOption {
+	return func(c *NbaFantasyClient) {
+		c.logger = l
+	}
+}
+
 type NbaFantasyClient struct {
+	logger *slog.Logger
+
     baseUrl *url.URL
     client *http.Client
 
