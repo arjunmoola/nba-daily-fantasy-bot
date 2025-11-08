@@ -2,6 +2,7 @@ package main
 
 import (
 	//"errors"
+	"text/template"
 	"strings"
 	"github.com/joho/godotenv"
 	"unicode"
@@ -18,6 +19,13 @@ import (
 	"sync"
 	"runtime"
 )
+
+var sqlcTemplate = `-- name: {{.Name}} :{{.An}}
+{{.Sql}}
+
+`
+
+var temp = template.Must(template.New("sqlc").Parse(sqlcTemplate))
 
 func walk(ctx context.Context, dir string, out chan <-string) error {
 	return filepath.WalkDir(dir, func(path string, info fs.DirEntry, err error) error {
@@ -152,6 +160,54 @@ func extractSqlFromStatement(stmt []byte) string {
 	stmt = stmt[:idx]
 
 	return string(stmt)
+}
+
+func parseStatement(stmt string) (string, string) {
+	tag := `"""`
+
+	idx := 0
+
+	leftIdx:= strings.Index(stmt, tag)
+	leftIdx += 3
+
+	idx = leftIdx
+
+	rightIdx := strings.Index(stmt[idx:], tag)
+	idx += rightIdx
+
+	sqlStmt := stmt[leftIdx:idx]
+	idx += 3
+
+	c := strings.Index(stmt[idx:], ")")
+	idx += c+1
+
+	for idx < len(stmt) {
+		if unicode.IsSpace(rune(stmt[idx])) {
+			idx++
+			continue
+		}
+
+		break
+	}
+
+	for idx < len(stmt) {
+		if unicode.IsSpace(rune(stmt[idx])) {
+			break
+		}
+		idx++
+	}
+
+	idx++
+
+	leftIdx = idx
+
+	rightIdx = strings.Index(stmt[leftIdx:], "(")
+
+	idx += rightIdx
+
+	funcName := stmt[leftIdx:idx]
+
+	return sqlStmt, funcName
 }
 
 func cleanupStatement(stmt string) string {
@@ -350,26 +406,45 @@ Loop:
 		return err
 	}
 
+	var sqlcArgs []sqlcArg
+
 	for _, res := range allStmts {
 		if len(res.stmts) == 0 {
 			continue
 		}
 
 		for _, stmt := range res.stmts {
+			var an string
+
+			if strings.Contains(stmt, "void") {
+				an = "exec"
+			} else if strings.Contains(stmt, "List") {
+				an = "many"
+			} else {
+				an = "one"
+			}
+
+			_, fName := parseStatement(stmt)
+
 			sqlStmt := extractSqlFromStatement([]byte(stmt))
 			sqlStmt = cleanupStatement(sqlStmt)
-			fmt.Println("old: ", sqlStmt)
-
 			args := extractArgsFromStatement([]byte(sqlStmt))
-
 			pairs := createReplacementPairs(args)
-
 			replacementArgs := replacementPairsToList(pairs)
-
 			newSql := strings.NewReplacer(replacementArgs...).Replace(sqlStmt)
 
-			fmt.Println(newSql)
+			sqlcArgs = append(sqlcArgs, sqlcArg{
+				Name: toCamelCase(fName),
+				An: an,
+				Sql: newSql,
+			})
 		}
+	}
+
+	for _, arg := range sqlcArgs {
+		temp.Execute(os.Stdout, arg)
+
+		//fmt.Println(arg)
 	}
 
 	if outputFile == "" {
@@ -377,6 +452,21 @@ Loop:
 	}
 
 	return nil
+}
+
+type sqlcArg struct {
+	Name string
+	An string
+
+	Sql string
+}
+
+func toCamelCase(s string) string {
+	if len(s) < 1 {
+		return ""
+	}
+
+	return strings.ToUpper(string(s[0])) + s[1:]
 }
 
 func main() {
