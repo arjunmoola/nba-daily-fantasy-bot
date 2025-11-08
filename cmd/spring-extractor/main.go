@@ -20,7 +20,7 @@ import (
 	"runtime"
 )
 
-var sqlcTemplate = `-- name: {{.Name}} :{{.An}}
+var sqlcTemplate = `-- name: {{.Name}} :{{.Annotation}}
 {{.Sql}}
 
 `
@@ -162,7 +162,7 @@ func extractSqlFromStatement(stmt []byte) string {
 	return string(stmt)
 }
 
-func parseStatement(stmt string) (string, string) {
+func parseStatement(stmt string) (string, string, string) {
 	tag := `"""`
 
 	idx := 0
@@ -190,12 +190,16 @@ func parseStatement(stmt string) (string, string) {
 		break
 	}
 
+	leftIdx = idx
+
 	for idx < len(stmt) {
 		if unicode.IsSpace(rune(stmt[idx])) {
 			break
 		}
 		idx++
 	}
+
+	annotation := stmt[leftIdx:idx]
 
 	idx++
 
@@ -207,11 +211,12 @@ func parseStatement(stmt string) (string, string) {
 
 	funcName := stmt[leftIdx:idx]
 
-	return sqlStmt, funcName
+	return sqlStmt, funcName, annotation
 }
 
 func cleanupStatement(stmt string) string {
-	stmt = string(bytes.TrimSpace([]byte(stmt)))
+	stmt = strings.TrimSpace(stmt)
+	stmt = strings.ToLower(stmt)
 
 	var buf bytes.Buffer
 
@@ -233,6 +238,10 @@ func cleanupStatement(stmt string) string {
 
 			buf.WriteRune(r)
 		}
+	}
+
+	if stmt[len(stmt)-1] != ';' {
+		buf.WriteRune(';')
 	}
 
 	return buf.String()
@@ -414,28 +423,27 @@ Loop:
 		}
 
 		for _, stmt := range res.stmts {
-			var an string
+			sqlStmt, fName, funcType := parseStatement(stmt)
 
-			if strings.Contains(stmt, "void") {
-				an = "exec"
-			} else if strings.Contains(stmt, "List") {
-				an = "many"
-			} else {
-				an = "one"
-			}
-
-			_, fName := parseStatement(stmt)
-
-			sqlStmt := extractSqlFromStatement([]byte(stmt))
 			sqlStmt = cleanupStatement(sqlStmt)
 			args := extractArgsFromStatement([]byte(sqlStmt))
 			pairs := createReplacementPairs(args)
 			replacementArgs := replacementPairsToList(pairs)
 			newSql := strings.NewReplacer(replacementArgs...).Replace(sqlStmt)
 
+			var annotation string
+
+			if funcType == "void" {
+				annotation = "exec"
+			} else if strings.HasPrefix(funcType, "List") {
+				annotation = "many"
+			} else {
+				annotation = "one"
+			}
+
 			sqlcArgs = append(sqlcArgs, sqlcArg{
 				Name: toCamelCase(fName),
-				An: an,
+				Annotation: annotation,
 				Sql: newSql,
 			})
 		}
@@ -443,12 +451,28 @@ Loop:
 
 	for _, arg := range sqlcArgs {
 		temp.Execute(os.Stdout, arg)
-
-		//fmt.Println(arg)
 	}
 
 	if outputFile == "" {
 		return nil
+	}
+
+	return saveStatementsToFile(outputFile, sqlcArgs)
+}
+
+func saveStatementsToFile(outputFile string, args []sqlcArg) error {
+	file, err := os.Create(outputFile)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+	
+	for _, arg := range args {
+		if err := temp.Execute(file, arg); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -456,7 +480,7 @@ Loop:
 
 type sqlcArg struct {
 	Name string
-	An string
+	Annotation string
 
 	Sql string
 }
@@ -476,9 +500,13 @@ func main() {
 	godotenv.Load()
 
 	defaultSpring := os.Getenv("DEFAULT_DIR")
+	defaultOutputFile := os.Getenv("DEFAULT_OUTPUT_DIR")
+
+	fmt.Println("default spring ", defaultSpring)
+	fmt.Println("default outputfile ", defaultOutputFile)
 
 	flag.StringVar(&springDir, "spring-dir", defaultSpring, "path to the directory to extract sql commands from")
-	flag.StringVar(&outputFile, "out", "", "path to save the output sql statements")
+	flag.StringVar(&outputFile, "out", defaultOutputFile, "path to save the output sql statements")
 	flag.Parse()
 
 	if springDir == "" {
