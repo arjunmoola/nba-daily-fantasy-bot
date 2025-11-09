@@ -5,7 +5,8 @@ import (
     //"os"
     "github.com/joho/godotenv"
     "context"
-    dailyfantasybot "github.com/arjunmoola/nba-daily-fantasy-bot/internal/daily-fantasy-bot"
+    "github.com/arjunmoola/nba-daily-fantasy-bot/internal/bot"
+	"github.com/arjunmoola/nba-daily-fantasy-bot/internal/config"
 )
 
 
@@ -14,17 +15,15 @@ func main() {
         log.Panic(err)
     }
 
-    bot, err := dailyfantasybot.NewNbaFantasyBot()
+	config := config.New()
 
-    if err != nil {
+    picknRollBot := bot.New(config)
+
+    if err := picknRollBot.Init(context.Background()); err != nil {
         log.Panic(err)
     }
 
-    if err := bot.Init(context.Background()); err != nil {
-        log.Panic(err)
-    }
-
-    if err := bot.Run(context.Background()); err != nil {
+    if err := picknRollBot.Run(context.Background()); err != nil {
         log.Panic(err)
     }
 }

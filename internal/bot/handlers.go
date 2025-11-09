@@ -1,6 +1,7 @@
-package dailyfantasybot
+package bot
 
 import (
+	"log/slog"
     "time"
     "log"
     "fmt"
@@ -11,6 +12,9 @@ import (
     "context"
     textpkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/text"
     typespkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/types"
+	"github.com/arjunmoola/nba-daily-fantasy-bot/internal/database"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func interactionAuthor(i *discordgo.Interaction) *discordgo.User {
@@ -37,6 +41,7 @@ func setRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordg
         }
     }
 }
+
 
 func resetRosterHandler(bot *NbaFantasyBot) func (s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -108,6 +113,70 @@ func resetRosterHandler(bot *NbaFantasyBot) func (s *discordgo.Session, i *disco
     }
 }
 
+func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler {
+    return func(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate) {
+        author := interactionAuthor(i.Interaction)
+        //guildId := i.Interaction.GuildID
+        discordPlayerId := author.ID
+
+        //date := time.Now().Format(time.DateOnly)
+
+		var todaysRoster []database.GetTodaysRosterByDiscordIdRow
+
+		err := pool.AcquireFunc(ctx, func(conn *pgxpool.Conn) error {
+			params := database.GetTodaysRosterByDiscordIdParams{
+				Discordid: discordPlayerId,
+				Date: pgtype.Date{
+					Time: time.Now(),
+					InfinityModifier: pgtype.Finite,
+					Valid: true,
+				},
+			}
+
+			results, err := database.New(conn).GetTodaysRosterByDiscordId(ctx, params)
+
+			if err != nil {
+				return err
+			}
+
+			todaysRoster = results
+
+			return nil
+		})
+
+		if err != nil {
+			log.Println(err)
+			errInteractionRespond(s, i, "unable to get my roster. http error")
+			return
+		}
+
+        builder := strings.Builder{}
+
+        totalValue := 0
+
+		for _, player := range todaysRoster {
+			totalValue += int(player.DollarValue.Int32)
+			fmt.Fprintf(&builder, "%s %s %d\n", player.Name, player.Position, int(player.DollarValue.Int32))
+		}
+
+        remainingValue := 100 - totalValue
+
+        builder.WriteString(fmt.Sprintf("remaining value: %d\n", remainingValue))
+
+        err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+            Type: discordgo.InteractionResponseChannelMessageWithSource,
+            Data: &discordgo.InteractionResponseData{
+                Content: builder.String(),
+                Flags: discordgo.MessageFlagsEphemeral,
+            },
+        })
+
+        if err != nil {
+            log.Println(err)
+            return
+        }
+    }
+}
 
 func getMyRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -342,6 +411,7 @@ func containsFunc[S []T, T any](s S, y T, f func(T, T) bool) bool {
         if f(x, y) {
             return true
         }
+
     }
     return false
 }

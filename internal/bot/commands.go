@@ -1,4 +1,4 @@
-package dailyfantasybot
+package bot
 
 import (
     "github.com/bwmarrin/discordgo"
