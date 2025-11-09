@@ -7,3 +7,10 @@ sql:
       go:
         out: "internal/database"
         sql_package: "pgx/v5"
+  - engine: "sqlite"
+    queries: "internal/sql/queries_cache"
+    schema: "internal/sql/schema_cache.sql"
+    gen:
+      go:
+        out: "internal/cache"
+        sql_package: "go-libsql"

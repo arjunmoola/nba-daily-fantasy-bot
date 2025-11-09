@@ -83,6 +83,27 @@ func createGetPGCommand() *discordgo.ApplicationCommand {
     }
 }
 
+func createGetPlayersCommand() *discordgo.ApplicationCommand {
+	return &discordgo.ApplicationCommand{
+		Name: "players",
+		Description: "Get players",
+		Type: discordgo.ChatApplicationCommand,
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name: "position",
+				Description: "Filter by position",
+				Type: discordgo.ApplicationCommandOptionSubCommand,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{
+						Name: "pg",
+						Value: "point guard",
+					},
+				},
+			},
+		},
+	}
+}
+
 func createGetMyRosterCommand() *discordgo.ApplicationCommand {
     return &discordgo.ApplicationCommand{
         Name: "my-roster",

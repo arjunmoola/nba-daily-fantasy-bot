@@ -148,9 +148,12 @@ func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler 
 			return
 		}
 
-        builder := strings.Builder{}
+		var builder strings.Builder
+		var totalValue int
 
-        totalValue := 0
+		if len(todaysRoster) == 0 {
+			fmt.Fprintln(&builder, "You have not set your roster for today")
+		}
 
 		for _, player := range todaysRoster {
 			totalValue += int(player.DollarValue.Int32)
@@ -159,7 +162,7 @@ func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler 
 
         remainingValue := 100 - totalValue
 
-        builder.WriteString(fmt.Sprintf("remaining value: %d\n", remainingValue))
+		fmt.Fprintf(&builder, "remaining value :%d\n", remainingValue)
 
         err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
             Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -176,51 +179,21 @@ func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler 
     }
 }
 
-func getMyRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-    return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-        author := interactionAuthor(i.Interaction)
-        guildId := i.Interaction.GuildID
-        discordPlayerId := author.ID
+func GetPlayersByPosHandler(l *slog.Logger, pool *pgxpool.Pool) ContextHandler {
+	return func(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate) {
+		err := pool.AcquireFunc(ctx, func(conn *pgxpool.Conn) error {
+			database.New(conn).GetTodaysNbaPlayersByPosition(ctx, "PG")
+			return nil
+		})
 
-        date := time.Now().Format(time.DateOnly)
-
-        discordPlayers, err := bot.client.GetMyRosterGuild(context.Background(), guildId, discordPlayerId, date)
-
-        if err != nil {
-            log.Println(err)
-            errInteractionRespond(s, i, "unable to get my roster. http error")
-            return
-        }
-
-        builder := strings.Builder{}
-
-        totalValue := 0
-
-        for _, player := range discordPlayers {
-            rosterPlayer := player.GetRosterPlayer()
-
-            totalValue += rosterPlayer.DollarValue
-            builder.WriteString(fmt.Sprintf("%s %s %d\n", rosterPlayer.Name, rosterPlayer.Position, rosterPlayer.DollarValue))
-        }
-
-        remainingValue := 100 - totalValue
-
-        builder.WriteString(fmt.Sprintf("remaining value: %d\n", remainingValue))
-
-        err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-            Type: discordgo.InteractionResponseChannelMessageWithSource,
-            Data: &discordgo.InteractionResponseData{
-                Content: builder.String(),
-                Flags: discordgo.MessageFlagsEphemeral,
-            },
-        })
-
-        if err != nil {
-            log.Println(err)
-            return
-        }
-    }
+		if err != nil {
+			l.Error("encountered error", "error", err)
+			errInteractionRespond(s, i, "internal error")
+			return
+		}
+	}
 }
+
 
 func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
     data := i.ApplicationCommandData()
@@ -241,7 +214,6 @@ func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discord
 
     for j, option := range data.Options {
         player, ok := bot.cache.getPlayer(option.Value.(string))
-
 
         if !ok {
             continue
@@ -286,12 +258,122 @@ func handleSetRosterInteractionApplicationCommand(bot *NbaFantasyBot, s *discord
     return err
 }
 
-func handleSetRosterInteractionAutocomplete(bot *NbaFantasyBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
+func SetRosterHandler(l *slog.Logger, pool *pgxpool.Pool) ContextHandler {
+	return func(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate) {
+		data := i.ApplicationCommandData()
+    	pos := []string{ "PG", "C", "SF", "PF", "SG" }
+		author := interactionAuthor(i.Interaction)
+		discordPlayerId := author.ID
+
+		var existingPlayers []database.GetTodaysRosterByDiscordIdRow
+
+		err := pool.AcquireFunc(ctx, func(conn *pgxpool.Conn) error {
+			params := database.GetTodaysRosterByDiscordIdParams{
+				Discordid: discordPlayerId,
+				Date: pgtype.Date{
+					Time: time.Now(),
+				},
+			}
+
+			result, err := database.New(conn).GetTodaysRosterByDiscordId(ctx, params)
+
+			if err != nil {
+				return err
+			}
+
+			existingPlayers = result
+
+			return nil
+
+		})
+
+		if err != nil {
+			l.Error("encountered error", "error", err)
+			errInteractionRespond(s, i, "internal error")
+			return
+		}
+
+		for i, option := range data.Options {
+			player, ok := 
+		}
+
+
+	}
+}
+
+func SetRosterAutocompleteHandler(l *slog.Logger, pool *pgxpool.Pool) ContextHandler {
+	return func(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate) {
+		data := i.ApplicationCommandData()
+
+		idx, pos := getFocusedOptionInfo(data.Options)
+
+		if idx < 0 || idx >= len(data.Options) {
+			l.Error("invalid index for data options", "indexValue", idx)
+			errInteractionRespond(s, i, "internal error")
+			return
+		}
+
+		players, err := getPlayersByPosition(ctx, pool, pos)
+
+		if err != nil {
+			l.Error("unable to get todays players by position", "position", pos)
+			errInteractionRespond(s, i, "internal error")
+			return
+		}
+
+		if data.Options[idx].StringValue() == "" {
+			defaultChoices := CreatePlayerChoices(25, players, func(n database.NbaPlayer) *discordgo.ApplicationCommandOptionChoice {
+				return &discordgo.ApplicationCommandOptionChoice{
+					Name: fmt.Sprintf("%s %s", n.Name, n.DollarValue),
+					Value: fmt.Sprintf("%d", n.NbaPlayerID),
+				}
+			})
+			autocompleteInteractionRespond(s, i, defaultChoices)
+			return
+		}
+
+		scores := ComputeClosestPlayers(data.Options[idx].StringValue(), players)
+
+		choices := CreatePlayerChoices(25, scores, func(n NbaPlayerScore) *discordgo.ApplicationCommandOptionChoice {
+			return &discordgo.ApplicationCommandOptionChoice{
+				Name: fmt.Sprintf("%s %d", n.Player, n.DollarValue),
+				Value: fmt.Sprintf("%d", n.Id),
+			}
+		})
+
+		autocompleteInteractionRespond(s, i, choices)
+	}
+}
+
+func getPlayersByPosition(ctx context.Context, pool *pgxpool.Pool, position string) ([]database.NbaPlayer, error) {
+	var players []database.NbaPlayer
+	
+	err := pool.AcquireFunc(ctx, func(conn *pgxpool.Conn) error {
+		result, err := database.New(conn).GetTodaysNbaPlayersByPosition(ctx, position)
+
+		if err != nil {
+			return err
+		}
+
+		players = result
+
+		return nil
+	})
+
+	return players, err
+}
+
+func handleSetRosterInteractionAutocomplete(bot *PicknRollBot, s *discordgo.Session, i *discordgo.InteractionCreate) error {
     data := i.ApplicationCommandData()
 
     var choices []*discordgo.ApplicationCommandOptionChoice
 
-    fmt.Println(data.Options)
+    //fmt.Println(data.Options)
+
+	idx, pos := getFocusedOptionInfo(data.Options)
+
+	if idx < 0 || idx >= len(data.Option) {
+	}
 
     switch {
     case data.Options[0].Focused:
@@ -348,7 +430,20 @@ func handleSetRosterInteractionAutocomplete(bot *NbaFantasyBot, s *discordgo.Ses
     }
 
     return autocompleteInteractionRespond(s, i, choices)
+}
 
+func getFocusedOptionInfo(options []*discordgo.ApplicationCommandInteractionDataOption) (int, string) {
+	positions := []string{ "PG", "C", "SF", "PF", "SG" }
+
+	idx := slices.IndexFunc(options, func(opt *discordgo.ApplicationCommandInteractionDataOption) bool {
+		return opt.Focused
+	})
+
+	if idx < 0 || idx >= len(positions) {
+		return idx, ""
+	}
+
+	return idx, positions[idx]
 }
 
 func autocompleteInteractionRespond(s *discordgo.Session, i *discordgo.InteractionCreate, choices []*discordgo.ApplicationCommandOptionChoice) error {
@@ -366,6 +461,55 @@ type playerScore struct {
     dollarValue int64
     id int
 }
+
+type NbaPlayerScore struct {
+	Player string
+	Score int
+	DollarValue int
+	Id int
+}
+
+func ComputeClosestPlayers(src string, players []database.NbaPlayer) []NbaPlayerScore {
+	scores := make([]NbaPlayerScore, 0, len(players))
+
+	for _, player := range players {
+        score := textpkg.ComputeSmithWatermanFunc(strings.ToLower(src), strings.ToLower(player.Name), textpkg.DefaultScorer)
+
+		scores = append(scores, NbaPlayerScore{
+			Player: player.Name,
+			Score: score,
+			DollarValue: int(player.DollarValue.Int32),
+			Id: int(player.NbaPlayerID),
+		})
+	}
+
+	scores = filterFunc(scores, func(n NbaPlayerScore) bool {
+		return n.Score > 4
+	})
+
+	return scores
+}
+
+func CreatePlayerChoices[S []T, T any](limit int, players S, f func(T) *discordgo.ApplicationCommandOptionChoice) []*discordgo.ApplicationCommandOptionChoice {
+	if len(players) > limit {
+		players = players[:limit]
+	}
+
+	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(players))
+
+	for _, player := range players {
+		choices = append(choices, f(player))
+	}
+
+	return choices
+}
+
+func CreatePlayerChoicesWithLimit[S []T, T any](n int) func(S, func(T) *discordgo.ApplicationCommandOptionChoice) []*discordgo.ApplicationCommandOptionChoice {
+	return func(s S, f func(T) *discordgo.ApplicationCommandOptionChoice) []*discordgo.ApplicationCommandOptionChoice {
+		return CreatePlayerChoices(n, s, f)
+	}
+}
+
 
 func getClosestPlayers(src string, players []typespkg.NbaPlayer) []playerScore {
     scores := make([]playerScore, len(players))
@@ -506,6 +650,10 @@ func GetTodaysGlobalLeaderboardHandler(l *slog.Logger, pool *pgxpool.Pool) Conte
 		fmt.Fprintln(&builder, "### Global Leaderboard")
 
 		var rows [][]string
+		embed := &discordgo.MessageEmbed{
+			Title: "test",
+			Description: "This is a test",
+		}
 
 		for _, player := range leaderBoard[:5] {
 			rows = append(rows, []string{
@@ -514,10 +662,11 @@ func GetTodaysGlobalLeaderboardHandler(l *slog.Logger, pool *pgxpool.Pool) Conte
 				fmt.Sprintf("%d", player.DollarValue.Int32),
 				fmt.Sprintf("%.2f", player.FantasyScore.Float64),
 			})
+
 		}
 
 		tab := table.New()
-		tab = tab.Border(lipgloss.NormalBorder())
+		tab = tab.Border(lipgloss.HiddenBorder())
 		tab = tab.Headers(
 			"Name",
 			"Position",
@@ -530,11 +679,18 @@ func GetTodaysGlobalLeaderboardHandler(l *slog.Logger, pool *pgxpool.Pool) Conte
 		fmt.Fprintln(&builder, tab.Render())
 		fmt.Fprintln(&builder, "```")
 
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name: "global leaderboard",
+			Value: builder.String(),
+			Inline: true,
+		})
+
 		err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-						Content: builder.String(),
-					},
+					Content: builder.String(),
+					Embeds:  []*discordgo.MessageEmbed{ embed },
+				},
 			})
 
 		if err != nil {
