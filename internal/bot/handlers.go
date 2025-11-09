@@ -12,6 +12,8 @@ import (
     "context"
     textpkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/text"
     typespkg "github.com/arjunmoola/nba-daily-fantasy-bot/internal/types"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/arjunmoola/nba-daily-fantasy-bot/internal/database"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -41,7 +43,6 @@ func setRosterHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordg
         }
     }
 }
-
 
 func resetRosterHandler(bot *NbaFantasyBot) func (s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -116,10 +117,7 @@ func resetRosterHandler(bot *NbaFantasyBot) func (s *discordgo.Session, i *disco
 func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler {
     return func(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate) {
         author := interactionAuthor(i.Interaction)
-        //guildId := i.Interaction.GuildID
         discordPlayerId := author.ID
-
-        //date := time.Now().Format(time.DateOnly)
 
 		var todaysRoster []database.GetTodaysRosterByDiscordIdRow
 
@@ -145,7 +143,7 @@ func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler 
 		})
 
 		if err != nil {
-			log.Println(err)
+			logger.Error("encountered error", "error", err)
 			errInteractionRespond(s, i, "unable to get my roster. http error")
 			return
 		}
@@ -172,7 +170,7 @@ func GetMyRosterHandler(logger *slog.Logger, pool *pgxpool.Pool) ContextHandler 
         })
 
         if err != nil {
-            log.Println(err)
+			logger.Error("encountered error", "error", err)
             return
         }
     }
@@ -349,7 +347,6 @@ func handleSetRosterInteractionAutocomplete(bot *NbaFantasyBot, s *discordgo.Ses
         }
     }
 
-
     return autocompleteInteractionRespond(s, i, choices)
 
 }
@@ -477,6 +474,76 @@ func createChoicesFromScores(scores []playerScore) []*discordgo.ApplicationComma
     return choices
 }
 
+func GetTodaysGlobalLeaderboardHandler(l *slog.Logger, pool *pgxpool.Pool) ContextHandler {
+	return func(ctx context.Context, s *discordgo.Session, i *discordgo.InteractionCreate) {
+		var leaderBoard []database.GetTodaysGlobalLeaderboardRow
+
+		err := pool.AcquireFunc(ctx, func(conn *pgxpool.Conn) error {
+			param := pgtype.Date{
+				Time: time.Now().AddDate(0, 0, -1),
+				Valid: true,
+			}
+
+			result, err := database.New(pool).GetTodaysGlobalLeaderboard(ctx, param)
+
+			if err != nil {
+				return err
+			}
+
+			leaderBoard = result
+
+			return nil
+		})
+
+		if err != nil {
+			l.Error("encountered error", "error", err)
+			errInteractionRespond(s, i, "internal error")
+			return
+		}
+
+		var builder strings.Builder
+
+		fmt.Fprintln(&builder, "### Global Leaderboard")
+
+		var rows [][]string
+
+		for _, player := range leaderBoard[:5] {
+			rows = append(rows, []string{
+				player.Name,
+				string(player.Position),
+				fmt.Sprintf("%d", player.DollarValue.Int32),
+				fmt.Sprintf("%.2f", player.FantasyScore.Float64),
+			})
+		}
+
+		tab := table.New()
+		tab = tab.Border(lipgloss.NormalBorder())
+		tab = tab.Headers(
+			"Name",
+			"Position",
+			"Dollar Value",
+			"Fantasy Score",
+		)
+		tab = tab.Rows(rows...)
+
+		fmt.Fprintln(&builder, "```ansi")
+		fmt.Fprintln(&builder, tab.Render())
+		fmt.Fprintln(&builder, "```")
+
+		err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+						Content: builder.String(),
+					},
+			})
+
+		if err != nil {
+			l.Error("error encountered", "error", err)
+			return
+		}
+	}
+}
+
 func getGlobalRosterCommandHandler(bot *NbaFantasyBot) func(s *discordgo.Session, i *discordgo.InteractionCreate) {
     return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
@@ -500,8 +567,7 @@ func getGlobalRosterCommandHandler(bot *NbaFantasyBot) func(s *discordgo.Session
 
         builder := strings.Builder{}
 
-        fmt.Fprintln(&builder, "### Global Leaderboard\n")
-
+        fmt.Fprintln(&builder, "### Global Leaderboard")
 
         for _, player := range leaderBoard {
             builder.WriteString(fmt.Sprintf("**%s** %.2f\n", player.Nickname, player.TotalScore))

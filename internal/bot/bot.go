@@ -125,9 +125,12 @@ func (b *PicknRollBot) Init(ctx context.Context) error {
 
 	registry := NewRegistry(
 		NewCommand(createGetMyRosterCommand(), GetMyRosterHandler(b.logger, b.pool)),
+		NewCommand(createGetGlobalRosterCommand(), GetTodaysGlobalLeaderboardHandler(b.logger, b.pool)),
 	)
 
 	b.registry = registry
+
+
 
     // b.addCommand(createSetRosterCommand())
     // b.registerHandler("set-roster", setRosterHandler(b))
@@ -145,9 +148,7 @@ func (b *PicknRollBot) Init(ctx context.Context) error {
 		b.logger.Info("bot is running")
     })
 
-	b.session.AddHandler(registry.DispatchWithLogger(b.logger))
-
-	//fmt.Println(b.lockTime.Date())
+	b.session.AddHandler(registry.DispatchWithLogger(b.logger.With("component", "dispatcher")))
 
 	return nil
 }
@@ -207,11 +208,13 @@ func (b *PicknRollBot) Run(ctx context.Context) error {
 	defer b.session.Close()
 	defer b.pool.Close()
 
-	_, err := b.registry.BulkOverWriteSession(b.session)
+	created, err := b.registry.BulkOverWriteSession(b.session)
 
     if err != nil {
         return err
     }
+
+	b.logger.Info("creating commands", "commands-created", len(created))
 
     stop := make(chan os.Signal, 1)
 
@@ -453,7 +456,6 @@ func (r *Registry) Dispatch(s *discordgo.Session, i *discordgo.InteractionCreate
 
 func (r *Registry) DispatchWithLogger(l *slog.Logger) func(*discordgo.Session, *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		l = l.With("component", "dispatcher")
 
 		switch i.Type {
 		case discordgo.InteractionPing:
